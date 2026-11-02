@@ -1,0 +1,44 @@
+# Push a tag matching VERSION_NAME in gradle.properties ("v0.1.0") to publish com.hermeticacomms:hermetica-kmp to Maven Central.
+# Maven Central has no OIDC trusted publishing, so this uses repo secrets. One-time setup:
+#   1. central.sonatype.com: sign in, add and verify the namespace com.hermeticacomms (a DNS TXT record on the domain),
+#      then Account > Generate User Token.
+#   2. Make a GPG signing key and publish it:  gpg --quick-gen-key "Hermetica <...>" && gpg --keyserver keyserver.ubuntu.com --send-keys <KEYID>
+#   3. Repo secrets:
+#        MAVEN_CENTRAL_USERNAME / MAVEN_CENTRAL_PASSWORD  the user token's username and password
+#        SIGNING_KEY       the ASCII-armoured private key:  gpg --armor --export-secret-keys <KEYID>
+#        SIGNING_PASSWORD  its passphrase
+name: release
+on:
+  push: { tags: ['v*'] }
+permissions: { contents: write, id-token: write, attestations: write }
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: test "v$(sed -n 's/^VERSION_NAME=//p' gradle.properties)" = "$GITHUB_REF_NAME"
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: 8.11.1 }
+      - run: gradle wrapper --gradle-version 8.11.1
+      - run: ./gradlew allTests
+      # Every target's artifacts (signed), via the local Maven repo so the exact published files are attested.
+      - run: ./gradlew publishToMavenLocal
+        env:
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+      - run: |
+          v="${GITHUB_REF_NAME#v}"
+          mkdir dist
+          find ~/.m2/repository/com/hermeticacomms -path "*/$v/*" -type f \( -name "*.jar" -o -name "*.aar" -o -name "*.klib" -o -name "*.pom" -o -name "*.module" \) -exec cp {} dist/ \;
+      - uses: actions/attest-build-provenance@v3
+        with: { subject-path: 'dist/*' }
+      - run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes
+        env: { GH_TOKEN: '${{ github.token }}' }

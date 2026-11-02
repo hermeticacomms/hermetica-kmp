@@ -1,0 +1,20 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: macos-latest # the iOS targets compile and test only on macOS
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: 8.11.1 }
+      # The wrapper jar is generated here rather than committed (version pinned in gradle/wrapper/gradle-wrapper.properties).
+      - run: gradle wrapper --gradle-version 8.11.1
+      - run: ./gradlew allTests assemble
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: reports, path: hermetica/build/reports/ }
