@@ -66,7 +66,6 @@ mavenPublishing {
     configure(KotlinMultiplatform(javadocJar = JavadocJar.Empty(), sourcesJar = true, androidVariantsToPublish = listOf("release")))
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()
-    coordinates("com.hermeticacomms", "hermetica-kmp", sdkVersion)
     pom {
         name.set("Hermetica Kotlin Multiplatform SDK")
         description.set("Events, identity, consent, push tokens and in-app messages for Hermetica, shared across Android and iOS.")
