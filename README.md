@@ -6,7 +6,7 @@ Kotlin (ktor, kotlinx.serialization). Events are queued on the device, sent in b
 
 ```kotlin
 // shared/build.gradle.kts
-commonMain.dependencies { implementation("com.hermeticacomms:hermetica-kmp:0.1.0") }
+commonMain.dependencies { implementation("com.hermeticacomms:hermetica-kmp:0.4.0") }
 ```
 
 ```kotlin
